@@ -1,0 +1,394 @@
+\chapter{Code Snippets and Configuration files}
+
+Here, I will place some of the scripts and configuration files mentioned during the development of the memory. They will be in appeareance order.
+
+\textbf{Create Cluster Script}
+
+\begin{lstlisting}[language=python, caption=Create Cluster script to automatically deploy the whole platform on minikube, label=CreateCluster]
+#!/bin/bash
+kubectl create namespace tfm
+kubectl apply -f kubernetes/mongodb-sc.yaml
+kubectl apply -f kubernetes/mongodb-statefulSet.yaml
+echo "Starting database... [1m]"
+sleep 60
+echo "Configuring replicaset... [30s]"
+sh statefulset/mongodb-rsconfig.sh mongodb-0
+kubectl apply -f kubernetes/mongodb-hservice.yaml
+echo "Starting mongodb UI... [1s]"
+kubectl apply -f kubernetes/mongodb-express.yaml
+sleep 10
+echo "Starting context broker and draco (Fiware)... [5s]"
+kubectl apply -f kubernetes/orion-service.yaml
+kubectl apply -f kubernetes/orion-deployment.yaml
+git clone https://github.com/ging/fiware-draco.git
+kubectl apply -f kubernetes/draco-service.yaml
+kubectl apply -f kubernetes/draco-deployment.yaml
+sleep 10
+echo "Starting Spark service account,volumes and services... [30s]"
+kubectl create -n tfm serviceaccount spark
+kubectl create -n tfm clusterrolebinding spark-role --clusterrole=edit --serviceaccount=tfm:spark --namespace=tfm
+kubectl apply -f kubernetes/spark-pv.yaml
+kubectl apply -f kubernetes/spark-pvc.yaml
+kubectl apply -f kubernetes/spark-hservice.yaml
+sleep 30
+echo "Starting Web UI..."
+kubectl apply -f kubernetes/prediction-web-deployment.yaml
+sleep 2
+echo "Running sink Job..."
+kubectl apply -f kubernetes/Jobs/sink-job.yaml
+sleep 5
+echo "Creating ORION entities and subscriptions..."
+pushd prediction-web/entities
+sh curlEntities.sh
+sleep 10
+popd
+echo "Submitting spark prediction Job..."
+cd spark-job
+mkdir -p spark-3.1.2 && curl -L https://dlcdn.apache.org/spark/spark-3.1.2/spark-3.1.2-bin-hadoop3.2.tgz | tar -zx -C spark-3.1.2/ --strip 1
+sh spark-submit-predict.sh
+sleep 20
+echo "Done"
+echo "Accessible services:"
+minikube service list
+\end{lstlisting}
+
+\textbf{ReqTicketPrediction}
+
+\begin{lstlisting}[language=json, caption=Definition file for the Orion entity that will define our requests tickets, label=ReqTicketPrediction]
+{
+    "id": "ReqTicketPrediction",
+    "type": "ReqTicketPrediction",
+    "predictionId": {
+    "value": 0,
+    "type": "String"
+    },
+    "socketId": {
+    "value": 0,
+    "type": "String"
+    },
+    "name":{
+    "value": 0,
+    "type": "String"
+    },
+    "year":{
+    "value": 0,
+    "type": "Int"
+    },
+    "month":{
+    "value": 0,
+    "type": "Int"
+    },
+    "day":{
+    "value": 0,
+    "type": "Int"
+    },
+    "weekday": {
+    "value": 0,
+    "type": "Integer"
+    },
+    "time": {
+    "value": 0,
+    "type": "Integer"
+    }
+}
+\end{lstlisting}
+
+\textbf{ResTicketPrediction}
+
+\begin{lstlisting}[language=json, caption=Definition file for the Orion entity that will define our response tickets, label=ResTicketPrediction]
+{
+    "id": "ResTicketPrediction",
+    "type": "ResTicketPrediction",
+    "predictionId": {
+        "value": "0",
+        "type": "String"
+    },
+    "socketId": {
+        "value": 0,
+        "type": "String"
+    },
+    "predictionValue":{
+        "value": 0,
+        "type": "Integer"
+    },
+    "name":{
+        "value": 0,
+        "type": "String"
+    },
+    "weekday":{
+        "value": 0,
+        "type": "Integer"
+    },
+    "time": {
+        "value": 0,
+        "type": "Integer"
+    }
+}
+\end{lstlisting}
+
+\textbf{subscribeReqPredictionTicket}:
+
+\begin{lstlisting}[language=json, caption=Definition file for the Orion subscription that will trigger the predictions on Spark, label=subscribeReqPredictionTicket]
+{
+    "description": "A subscription to get ticket predictions",
+    "subject": {
+        "entities": [
+        {
+            "id": "ReqTicketPrediction",
+            "type": "ReqTicketPrediction"
+        }
+        ],
+        "condition": {
+        "attrs": [
+        "predictionId"
+        ]
+        }
+    },
+    "notification": {
+        "http": {
+        "url": "http://spark-predict-svc:9001"
+        },
+        "attrs": [
+        "predictionId",
+        "socketId",
+        "name",
+        "year",
+        "month",
+        "day",
+        "weekday",
+        "time"
+        ]
+    },
+    "expires": "2040-01-01T14:00:00.00Z",
+    "throttling": 5
+}
+\end{lstlisting}
+
+
+\textbf{subscribeResPredictionTicket}:
+
+\begin{lstlisting}[language=json, caption=Definition file for the Orion subscription that will trigger the response to the webapp., label=subscribeResPredictionTicket]
+{
+    "description": "A subscription to get ticket predictions",
+    "subject": {
+        "entities": [
+        {
+            "id": "ResTicketPrediction",
+            "type": "ResTicketPrediction"
+        }
+        ],
+        "condition": {
+        "attrs": [
+        "predictionId"
+        ]
+        }
+    },
+    "notification": {
+        "http": {
+        "url": "http://web-service:3000/notify"
+        },
+        "attrs": [
+        "predictionId",
+        "socketId",
+        "predictionValue",
+        "name",
+        "weekday",
+        "time"
+        ]
+    },
+    "expires": "2040-01-01T14:00:00.00Z",
+    "throttling": 5
+}
+\end{lstlisting}
+
+\textbf{subscribeResDracoPredictionTicket}:
+
+\begin{lstlisting}[language=json, caption=Definition file for the Orion subscription that will trigger Draco por processing., label=subscribeResDracoPredictionTicket]
+{
+    "description": "A subscription to get ticket predictions",
+    "subject": {
+      "entities": [
+        {
+          "id": "ResTicketPrediction",
+          "type": "ResTicketPrediction"
+        }
+      ],
+      "condition": {
+        "attrs": [
+        "predictionId",
+        "socketId",
+        "predictionValue",
+        "name",
+        "weekday",
+        "time"
+        ]
+      }
+    },
+    "notification": {
+      "http": {
+        "url": "http://draco:5050/v2/notify"
+      },
+      "attrs": [
+        "predictionId",
+        "socketId",
+        "predictionValue",
+        "name",
+        "weekday",
+        "time"
+      ]
+    },
+    "expires": "2040-01-01T14:00:00.00Z",
+    "throttling": 5
+}
+\end{lstlisting}
+
+\textbf{MongoDB Kubernetes StatefulSet}
+
+\begin{lstlisting}[language=yaml,caption=Kubernetes YAML definition file for MongoDB StatefulSet Deployment, label=MongoKubernetes]
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    name: mongodb
+    namespace: tfm
+spec:
+    serviceName: mongodb-svc
+    replicas: 3
+    selector:
+    matchLabels:
+        app: db
+        name: mongodb
+    template:
+    metadata:
+        namespace: tfm
+        labels:
+        app: db
+        name: mongodb
+        replicaset: MainRepSet
+    spec:
+        terminationGracePeriodSeconds: 10
+        containers:
+        - name: mongo
+            image: mongo
+            command:
+            - "mongod"
+            - "--bind_ip"
+            - "0.0.0.0"
+            - "--replSet"
+            - "MainRepSet"
+            resources:
+            requests:
+                cpu: 0.2
+                memory: 200Mi
+            ports:
+            - containerPort: 27017
+            volumeMounts:
+            - name: mongodb-persistent-storage-claim
+                mountPath: /data/db
+    volumeClaimTemplates:
+    - metadata:
+        name: mongodb-persistent-storage-claim
+    spec:
+        storageClassName: mongodb
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+        requests:
+            storage: 1Gi
+\end{lstlisting}
+
+\textbf{Orion Kubernetes Deployment and Service}:
+
+\begin{lstlisting}[language=yaml,caption=Kubernetes YAML definition file for Orion Deployment, label=OrionKubernetes]
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+        labels:
+        service: orion
+        name: orion
+        namespace: tfm
+    spec:
+        replicas: 1
+        selector:
+        matchLabels:
+            service: orion
+        template:
+        metadata:
+            namespace: tfm
+            labels:
+            service: orion
+        spec:
+            containers:
+            - args: ["-dbhost","mongodb-svc:27017","-rplSet","MainRepSet","-logLevel","DEBUG","-httpTimeout","15000","-dbDisableRetryWrites","-port","1026"] 
+                image: fiware/orion
+                name: orion
+                ports:
+                - containerPort: 1026
+            restartPolicy: Always
+\end{lstlisting}
+
+
+\begin{lstlisting}[language=yaml,caption=Kubernetes YAML definition file for Orion Service, label=OrionKubernetesService]
+    apiVersion: v1
+    kind: Service
+    metadata:
+      namespace: tfm
+      labels:
+        service: orion
+      name: orion
+    spec:
+      type: NodePort
+      ports:
+        - port: 1026
+          targetPort: 1026
+          nodePort: 30329
+      selector:
+        service: orion
+\end{lstlisting}
+
+\textbf{Draco Kubernetes Deployment and Service}:
+
+\begin{lstlisting}[language=yaml,caption=Kubernetes YAML definition file for Draco Deployment., label=DracoKubernetes]
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+        labels:
+        service: draco
+        name: draco
+        namespace: tfm
+    spec:
+        replicas: 1
+        selector:
+        matchLabels:
+            app: draco
+        template:
+        metadata:
+            namespace: tfm
+            labels:
+            app: draco
+        spec:
+            containers:
+            - name: draco
+            image: tonihurtado/draco:latest
+            imagePullPolicy: Always
+            restartPolicy: Always
+\end{lstlisting}
+
+\begin{lstlisting}[language=yaml,caption=Kubernetes YAML definition file for Draco Service., label=DracoKubernetesService]
+apiVersion: v1
+kind: Service
+metadata:
+    namespace: tfm
+    labels:
+    service: draco  
+    name: draco
+spec:
+    type: NodePort
+    ports:
+    - port: 5050
+        targetPort: 5050
+        name: data
+    - port: 8080
+        targetPort: 8080
+        name: ui
+    selector:
+    app: draco
+\end{lstlisting}

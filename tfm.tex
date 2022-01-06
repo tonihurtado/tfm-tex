@@ -1,26 +1,24 @@
 % !TeX root = tfm.tex
-\documentclass[a4paper,11pt]{book}
+\documentclass[a4paper,11pt]{report}
 %\documentclass[a4paper,twoside,11pt,titlepage]{book}
 \usepackage{listings}
 \usepackage[utf8]{inputenc}
-\usepackage[spanish]{babel}
 
 
 % \usepackage[style=list, number=none]{glossary} %
 %\usepackage{titlesec}
 %\usepackage{pailatino}
 
-\decimalpoint
 \usepackage{dcolumn}
 \newcolumntype{.}{D{.}{\esperiod}{-1}}
 \makeatletter
-\addto\shorthandsspanish{\let\esperiod\es@period@code}
 \makeatother
 
 
 %\usepackage[chapter]{algorithm}
 %\RequirePackage{verbatim}
 %\RequirePackage[Glenn]{fncychap}
+\usepackage[dvipsnames]{xcolor}
 \usepackage{fancyhdr}
 \usepackage{graphicx}
 \usepackage{afterpage}
@@ -105,6 +103,90 @@
 	tabsize=2
 } 
 
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+
+\definecolor{eclipseStrings}{RGB}{42,0.0,255}
+\definecolor{eclipseKeywords}{RGB}{127,0,85}
+\colorlet{numb}{magenta!60!black}
+
+\lstdefinelanguage{json}{
+    basicstyle=\normalfont\ttfamily,
+    commentstyle=\color{eclipseStrings}, % style of comment
+    stringstyle=\color{eclipseKeywords}, % style of strings
+    numbers=left,
+    numberstyle=\scriptsize,
+    stepnumber=1,
+    numbersep=8pt,
+    belowskip=1em,
+	aboveskip=2em,
+    showstringspaces=false,
+    breaklines=true,
+    string=[s]{"}{"},
+    comment=[l]{:\ "},
+    morecomment=[l]{:"},
+    literate=
+        *{0}{{{\color{numb}0}}}{1}
+         {1}{{{\color{numb}1}}}{1}
+         {2}{{{\color{numb}2}}}{1}
+         {3}{{{\color{numb}3}}}{1}
+         {4}{{{\color{numb}4}}}{1}
+         {5}{{{\color{numb}5}}}{1}
+         {6}{{{\color{numb}6}}}{1}
+         {7}{{{\color{numb}7}}}{1}
+         {8}{{{\color{numb}8}}}{1}
+         {9}{{{\color{numb}9}}}{1}
+}
+
+
+\newcommand\YAMLcolonstyle{\color{red}\mdseries}
+\newcommand\YAMLkeystyle{\color{black}\bfseries}
+\newcommand\YAMLvaluestyle{\color{blue}\mdseries}
+
+\makeatletter
+
+% here is a macro expanding to the name of the language
+% (handy if you decide to change it further down the road)
+\newcommand\language@yaml{yaml}
+
+\expandafter\expandafter\expandafter\lstdefinelanguage
+\expandafter{\language@yaml}
+{
+  keywords={true,false,null,y,n},
+  basicstyle=\normalfont\ttfamily,                             % assuming a key comes first
+  sensitive=false,
+  comment=[l]{\#},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\YAMLvaluestyle\ttfamily,
+  numbers=left,
+numberstyle=\scriptsize,
+stepnumber=1,
+numbersep=8pt,
+belowskip=1em,
+aboveskip=2em,
+showstringspaces=false,
+breaklines=true,
+  moredelim=[l][\color{orange}]{\&},
+  moredelim=[l][\color{magenta}]{*},
+  moredelim=**[il][\YAMLcolonstyle{:}\YAMLvaluestyle]{:},   % switch to value style at :
+  morestring=[b]',
+  morestring=[b]",
+  literate =    {---}{{\ProcessThreeDashes}}3
+                {>}{{\textcolor{red}\textgreater}}1
+                {|}{{\textcolor{red}\textbar}}1
+                {\ -\ }{{\mdseries\ -\ }}3,
+}
+
+% switch to key style at EOL
+\lst@AddToHook{EveryLine}{\ifx\lst@language\language@yaml\YAMLkeystyle\fi}
+\makeatother
+
+\newcommand\ProcessThreeDashes{\llap{\color{cyan}\mdseries-{-}-}}
+
+\setlength{\parskip}{\baselineskip}%
+\setlength{\parindent}{0pt}%
 
 % minimizar fragmentado de listados
 \lstnewenvironment{listing}[1][]
@@ -112,6 +194,7 @@
 
 \lstset{style=Python}
 
+\setlength{\parindent}{0cm}
 
 \newcommand{\bigrule}{\titlerule[0.5mm]}
 
@@ -140,24 +223,26 @@
 \begin{document}
 %\pdfbookmark[-1]{Memoria proyecto}{}
 \input{portada/portada}
+\input{portada/portada_2}
 %\input{portada/portada_2}
-%\input{prefacios/prefacio}
-\frontmatter
+\input{portada/prefacio}
 %\pdfbookmark[0]{Índice}{}
 \tableofcontents
 \listoffigures
 \listoftables
-\mainmatter
 
 % Ficheros con los contenidos
 
 \input{capitulos/01_Introduction}
-
-
+\input{capitulos/02_State_of_art}
+\input{capitulos/03_Motivation}
+\input{capitulos/04_Development}
+\input{capitulos/05_Improvements_and_future_work}
+\input{capitulos/06_Conclusions}
 % Añadimos los apéndices que hagan falta
 %\pdfbookmark[-1]{}{}
-%\appendix
-%\input{apendices/Apendices}
+\appendix
+\input{apendices/01_Code_Snippets}
 \thispagestyle{empty}
 
 % Añadimos la bibliografia

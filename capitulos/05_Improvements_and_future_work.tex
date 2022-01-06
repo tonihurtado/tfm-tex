@@ -1,0 +1,12 @@
+\chapter{Improvements and Future Work}
+\label{chapter:Improvements}
+
+The major shortcoming of this project has been the fact of not having a dataset large enough to perform an adequate training of the model, due to the non-existence of a register of past values by the entity providing the data in real-time. This led us not to obtain an accuracy value as good as we would have liked for our model. We have solved this problem by collecting the data ourselves, and as time goes by the size of the available dataset will increase, and with it, the evaluation parameters of the model will improve.
+
+On the other hand, taking this deployment to a cloud service provider, even if it was a big challenge, would have been better in order to obtain a more realistic and robust system both for the Kubernetes cluster and, consequently, for Spark. This was not possible because the hardware resource requirements of our system design far exceeded those provided in the free plans of most platforms, even when student credits were provided.
+
+Another improvement that could be really useful would have been to create a connector to be able to update the data of the public parking measurements directly to our context broker, through the implementation of an actuator. This would involve developing a service similar to the data sink, but that every time it reads the data from the source, it notifies Orion through the NGSIv2 API, providing it with the context information to be stored in our database through a Draco subscription. This could have helped us to integrate even more the system with the FIWARE components, and unify all the data flows through the Context Broker, but this solution required our cluster to be on for the whole time of the development of the project, so we decided to keep the data scraping service outside of the cluster.
+
+Regarding tools and enhancements that could be added to improve the quality of the system, the Kubernetes configuration files could be moved to an infrastructure-as-code (IaS) tool, such as Terraform, which would allow us to add another layer of abstraction to our deployment. With this change, moving our system to a cloud service provider would be virtually automatic.
+
+Also adding deployment automation and integration tools such as CircleCI or Jenkins would make the process of deploying our applications to the cluster automatic once we create a change in the Git repository. This is what is known as continuous integration, and its application is very interesting and useful in many use cases. 
